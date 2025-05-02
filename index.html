@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adsense Miner</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- Firebase SDKs (Compat version for simpler syntax in demo) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <!-- Chart.js (Optional, for dashboard chart) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+
+    <style>
+        /* --- Reset & Global Styles --- */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        :root {
+            --primary-color: #1a73e8; /* Google Blue */
+            --primary-color-dark: #185abc;
+            --background-color: #f8f9fa; /* Lighter Gray */
+            --card-background: #ffffff;
+            --text-color: #202124; /* Darker text */
+            --text-color-secondary: #5f6368; /* Medium Gray */
+            --border-color: #dadce0; /* Light Gray Border */
+            --border-color-input: #80868b;
+            --success-color: #1e8e3e;
+            --error-color: #d93025;
+            --pending-color-bg: #feefc3;
+            --pending-color-text: #7b5f02;
+            --confirmed-color-bg: #e6f4ea;
+            --confirmed-color-text: #137333;
+            --rejected-color-bg: #fce8e6;
+            --rejected-color-text: #c5221f;
+            --open-color-bg: #e8f0fe;
+            --open-color-text: #1967d2;
+
+            --sidebar-width: 250px;
+            --header-height: 64px;
+            --standard-padding: 24px;
+            --card-padding: 20px;
+            --border-radius: 8px;
+            --card-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+            --input-shadow-focus: 0 0 0 2px rgba(26, 115, 232, 0.2);
+            --sidebar-collapsed-width: 70px; /* Collapsed width variable (still used in responsive) */
+        }
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            font-size: 16px; /* Base font size */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Initial centering for auth view */
+        body.auth-active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        a:hover {
+            color: var(--primary-color-dark);
+            text-decoration: underline;
+        }
+        .material-icons {
+            vertical-align: middle;
+            line-height: 1;
+            font-size: 20px; /* Consistent icon size */
+        }
+
+        /* --- Loading Indicator --- */
+        #loading-indicator {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            font-size: 1.1em;
+            color: var(--text-color-secondary);
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+         #loading-indicator.hidden {
+            opacity: 0;
+            pointer-events: none;
+         }
+
+        /* --- Authentication View --- */
+        .auth-container {
+            background-color: var(--card-background);
+            padding: 35px 45px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+            margin: 20px; /* Add margin for smaller screens */
+        }
+        .auth-container h2 {
+            margin-bottom: 30px;
+            color: var(--text-color);
+            font-weight: 500;
+            font-size: 1.6em;
+        }
+        .form-group {
+            margin-bottom: 22px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.9em;
+            color: var(--text-color-secondary);
+            font-weight: 500;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color-input);
+            border-radius: 4px;
+            font-size: 1em;
+            color: var(--text-color);
+            background-color: #fff;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: var(--input-shadow-focus);
+        }
+        .form-group textarea {
+             min-height: 100px;
+             resize: vertical;
+        }
+        /* Select arrow styling */
+        .form-group select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%235f6368' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px 16px;
+            padding-right: 40px; /* Space for arrow */
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: #ffffff;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            width: 100%;
+            margin-top: 15px;
+            font-weight: 500;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .btn:hover {
+            background-color: var(--primary-color-dark);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            text-decoration: none;
+            color: #ffffff;
+        }
+         .btn .material-icons {
+             margin-right: 8px;
+             font-size: 18px;
+         }
+
+        .auth-switch {
+            margin-top: 25px;
+            font-size: 0.9em;
+            color: var(--text-color-secondary);
+        }
+        .auth-switch a {
+            font-weight: 500;
+        }
+        .error-message {
+            color: var(--error-color);
+            font-size: 0.9em;
+            margin-top: 15px;
+            min-height: 1.25em; /* Prevent layout shift */
+            text-align: center; /* Center error */
+        }
+         .success-message {
+             color: var(--success-color);
+             font-size: 0.9em;
+             margin-top: 10px;
+             margin-bottom: 10px;
+             min-height: 1.25em;
+             text-align: center;
+         }
+        .forgot-password {
+             font-size: 0.9em;
+             margin-top: 10px;
+             display: block;
+             text-align: right;
+        }
+
+        /* --- Main Application Layout --- */
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--card-background);
+            border-right: 1px solid var(--border-color);
+            padding-top: 20px;
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease; /* Keep for responsive collapse */
+            z-index: 100;
+            flex-shrink: 0;
+        }
+        .sidebar .logo {
+            font-size: 1.6em;
+            font-weight: 500;
+            padding: 0 var(--standard-padding) 20px var(--standard-padding);
+            color: var(--text-color);
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        .sidebar nav {
+            flex-grow: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .sidebar nav ul {
+            list-style: none;
+        }
+        .sidebar nav li {
+            padding: 14px var(--standard-padding);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            color: var(--text-color-secondary);
+            font-weight: 500;
+            border-left: 4px solid transparent;
+            transition: background-color 0.2s ease, color 0.2s ease, border-left-color 0.2s ease;
+            white-space: nowrap;
+            font-size: 0.95em;
+            overflow: hidden;
+        }
+        .sidebar nav li:hover {
+            background-color: rgba(26, 115, 232, 0.06);
+        }
+        .sidebar nav li.active {
+            color: var(--primary-color);
+            background-color: rgba(26, 115, 232, 0.1);
+            border-left-color: var(--primary-color);
+        }
+        .sidebar nav li .material-icons {
+             margin-right: 20px;
+             color: var(--text-color-secondary);
+             transition: color 0.2s ease;
+             flex-shrink: 0;
+         }
+        .sidebar nav li.active .material-icons {
+             color: var(--primary-color);
+        }
+
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            background-color: var(--background-color);
+            height: 100vh;
+        }
+        .app-header {
+            height: var(--header-height);
+            background-color: var(--card-background);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between; /* Original alignment */
+            padding: 0 var(--standard-padding);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+        .app-header #page-title {
+            font-size: 1.5em;
+            font-weight: 400;
+            color: var(--text-color);
+            /* margin-left: 10px; REMOVED - No button */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            /* flex-grow: 1; Removed to allow profile section to align right */
+        }
+        .profile-section {
+            position: relative;
+            flex-shrink: 0;
+            margin-left: auto; /* Ensure profile section is pushed to the right */
+        }
+        .profile-button {
+            background: none; border: none; cursor: pointer;
+            display: flex; align-items: center;
+            padding: 8px 12px; border-radius: 18px;
+            transition: background-color 0.2s ease;
+        }
+         .profile-button:hover { background-color: rgba(0,0,0, 0.05); }
+        .profile-button .material-icons { color: var(--text-color-secondary); }
+        .profile-button .material-icons:first-child { font-size: 28px; margin-right: 8px; }
+        .profile-button .material-icons:last-child { font-size: 24px; margin-left: 8px; }
+        .profile-button #user-email-display {
+            font-size: 0.9em; color: var(--text-color-secondary);
+            max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .profile-dropdown {
+            display: none; position: absolute; top: calc(100% + 5px); right: 0;
+            background-color: var(--card-background); border: 1px solid var(--border-color);
+            border-radius: var(--border-radius); box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 180px; z-index: 101; padding: 8px 0; overflow: hidden;
+        }
+        .profile-dropdown a { display: block; padding: 10px 18px; color: var(--text-color); font-size: 0.95em; white-space: nowrap; }
+        .profile-dropdown a:hover { background-color: #f1f3f4; text-decoration: none; color: var(--text-color); }
+        .profile-section.open .profile-dropdown { display: block; }
+
+        /* --- Page Content Area --- */
+        #page-content-area { padding: var(--standard-padding); flex-grow: 1; }
+        .card { background-color: var(--card-background); border-radius: var(--border-radius); padding: var(--card-padding); margin-bottom: var(--standard-padding); box-shadow: var(--card-shadow); }
+        .card-title { font-size: 1.25em; font-weight: 500; margin-bottom: 18px; color: var(--text-color); padding-bottom: 10px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; }
+         .card-title .material-icons { margin-right: 10px; color: var(--primary-color); font-size: 22px; }
+        .stat-card { text-align: center; padding: var(--card-padding) 15px; }
+        .stat-value { font-size: 2em; font-weight: 500; color: var(--primary-color); margin-bottom: 5px; line-height: 1.1; }
+        .stat-label { font-size: 0.9em; color: var(--text-color-secondary); }
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--standard-padding); margin-bottom: var(--standard-padding); }
+
+        /* Specific Page Styles */
+        #mining-progress-bar { width: 100%; height: 8px; background-color: #e0e0e0; border-radius: 4px; overflow: hidden; margin: 15px 0 5px 0; }
+        #mining-progress-fill { width: 0; height: 100%; background-color: var(--primary-color); border-radius: 4px; transition: width 0.5s ease-out; }
+        .info-pair { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.95em; padding: 5px 0; border-bottom: 1px dashed var(--border-color); }
+         .info-pair:last-child { border-bottom: none; }
+        .info-pair span:first-child { color: var(--text-color-secondary); }
+        .info-pair span:last-child { font-weight: 500; text-align: right; }
+
+        #referral-link-container { display: flex; margin-bottom: 10px; }
+        #referral-link-input { flex-grow: 1; padding: 10px 12px; border: 1px solid var(--border-color-input); border-radius: 4px 0 0 4px; background-color: #f1f3f4; font-size: 0.95em; color: var(--text-color-secondary); overflow-x: hidden; text-overflow: ellipsis; }
+        #copy-ref-link-btn { padding: 10px 15px; border-radius: 0 4px 4px 0; border: 1px solid var(--border-color-input); border-left: none; background-color: #e8eaed; cursor: pointer; font-size: 0.95em; color: var(--text-color-secondary); transition: background-color 0.2s ease; white-space: nowrap; display: flex; align-items: center; }
+        #copy-ref-link-btn .material-icons { margin-right: 5px; font-size: 18px; }
+        #copy-ref-link-btn:hover { background-color: #dfe1e5; }
+        #copy-status { font-size: 0.85em; color: var(--success-color); margin-top: 5px; min-height: 1em; }
+
+        /* Table Styling */
+         .table-container { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color); border-radius: var(--border-radius); margin-top: 15px; background-color: var(--card-background); }
+        table { width: 100%; border-collapse: collapse; min-width: 650px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 0.9em; white-space: nowrap; }
+        th { background-color: #f8f9fa; font-weight: 500; color: var(--text-color-secondary); text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.8em; }
+         tr:last-child td { border-bottom: none; }
+         tr:hover { background-color: #f1f3f4; }
+        td .status { padding: 4px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 500; display: inline-block; text-transform: capitalize; }
+        td .status.pending { background-color: var(--pending-color-bg); color: var(--pending-color-text); }
+        td .status.confirmed, td .status.completed, td .status.responded, td .status.closed { background-color: var(--confirmed-color-bg); color: var(--confirmed-color-text); }
+        td .status.rejected { background-color: var(--rejected-color-bg); color: var(--rejected-color-text); }
+        td .status.open { background-color: var(--open-color-bg); color: var(--open-color-text); }
+
+        /* How to Earn Page */
+        .guide-section { margin-bottom: 30px; }
+        .guide-section h3 { font-size: 1.3em; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; color: var(--primary-color); }
+        .guide-section h3 .material-icons { font-size: 24px; margin-right: 10px; color: var(--primary-color); }
+        .guide-section p, .guide-section ol, .guide-section ul { margin-bottom: 15px; color: var(--text-color-secondary); font-size: 1em;}
+        .guide-section li { margin-bottom: 10px; margin-left: 25px; }
+        .guide-section strong { color: var(--text-color); font-weight: 500; }
+        .guide-visual { text-align: center; margin: 20px 0; }
+        .guide-visual .material-icons { font-size: 38px; color: var(--text-color-secondary); margin: 0 20px; opacity: 0.7; }
+
+        /* --- Chart Container Styling (Kept) --- */
+        .chart-container {
+            position: relative; height: 300px; width: 100%;
+            margin-top: 15px; overflow: hidden;
+        }
+        .chart-container canvas {
+            display: block; width: 100% !important; height: 100% !important;
+        }
+
+        /* --- Sidebar Toggle Styles REMOVED --- */
+
+
+        /* --- Utility Classes --- */
+        .hidden { display: none !important; }
+        .text-center { text-align: center; }
+        .mt-1 { margin-top: 10px; }
+        .mt-2 { margin-top: 20px; }
+        .mb-1 { margin-bottom: 10px; }
+        .mb-2 { margin-bottom: 20px; }
+        .text-danger { color: var(--error-color); }
+        .text-success { color: var(--success-color); }
+        .text-secondary { color: var(--text-color-secondary); }
+        .font-small { font-size: 0.85em; }
+
+        /* --- Responsive Design --- */
+        @media (max-width: 992px) {
+             .grid-container { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+             /* Optional collapse logic removed */
+        }
+
+        @media (max-width: 768px) {
+            :root {
+                 --standard-padding: 16px;
+                 --card-padding: 15px;
+            }
+
+            /* Default to collapsed state appearance on small screens */
+            .sidebar {
+                width: var(--sidebar-collapsed-width);
+                overflow: hidden;
+            }
+            .sidebar .logo { display: none; }
+            .sidebar nav li {
+                justify-content: center; padding: 18px 0;
+                border-left-width: 3px; padding-left: 0; padding-right: 0;
+            }
+            .sidebar nav li span:not(.material-icons) { display: none; }
+            .sidebar nav li .material-icons { margin-right: 0; font-size: 24px; }
+
+            /* Main content adjusted for the collapsed sidebar */
+.main-content {
+    margin-left: 0;
+}
+            }
+
+            /* Header adjustments */
+            .app-header {
+                padding: 0 var(--standard-padding);
+                /* justify-content: flex-start; REMOVED */
+            }
+            .app-header #page-title {
+                font-size: 1.3em;
+                 margin-left: 0; /* Reset margin */
+            }
+            .profile-button #user-email-display { display: none; }
+            .profile-button .material-icons:last-child { margin-left: 0; }
+            .profile-button { padding: 8px; }
+
+            /* Sidebar toggle button rules removed */
+
+            #page-content-area { padding: var(--standard-padding); }
+            .grid-container { grid-template-columns: 1fr; gap: var(--standard-padding); }
+            .auth-container { padding: 25px 20px; margin: 15px; }
+             .auth-container h2 { font-size: 1.4em; }
+            .stat-value { font-size: 1.8em; }
+            .stat-label { font-size: 0.85em; }
+             .card-title { font-size: 1.15em; }
+             .form-group input, .form-group select, .form-group textarea { padding: 10px 12px; font-size: 0.95em; }
+              .btn { padding: 10px 20px; font-size: 0.95em; }
+        }
+
+         @media (max-width: 480px) {
+             :root {
+                  --standard-padding: 12px;
+                  --card-padding: 12px;
+             }
+              .app-header #page-title { font-size: 1.2em; }
+              .guide-section h3 { font-size: 1.2em;}
+              .guide-section p, .guide-section ol, .guide-section ul { font-size: 0.95em;}
+         }
+
+    </style>
+</head>
+<body class="auth-active"> <!-- Start with auth centering -->
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" class="hidden">
+        <span class="material-icons" style="font-size: 36px; animation: spin 1.5s linear infinite;">sync</span>
+        <span style="margin-left: 10px;">Loading...</span>
+        <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
+    </div>
+
+    <!-- Authentication View -->
+    <div id="auth-view" class="auth-container hidden">
+        <!-- Login Form -->
+        <form id="login-form" class="">
+            <h2>Login</h2>
+            <div class="form-group"> <label for="login-email">Email</label> <input type="email" id="login-email" required autocomplete="email"> </div>
+            <div class="form-group"> <label for="login-password">Password</label> <input type="password" id="login-password" required autocomplete="current-password"> </div>
+             <a href="#" id="forgot-password-link" class="forgot-password">Forgot Password?</a>
+            <p id="login-error" class="error-message"></p>
+            <button type="submit" class="btn">Login</button>
+            <p class="auth-switch">Don't have an account? <a href="#" id="show-signup">Sign Up</a></p>
+        </form>
+
+        <!-- Signup Form -->
+        <form id="signup-form" class="hidden">
+            <h2>Sign Up</h2>
+            <div class="form-group"> <label for="signup-email">Email</label> <input type="email" id="signup-email" required autocomplete="email"> </div>
+            <div class="form-group"> <label for="signup-password">Password (min. 6)</label> <input type="password" id="signup-password" required minlength="6" autocomplete="new-password"> </div>
+             <div class="form-group"> <label for="signup-ref-code">Referral Code (Optional)</label> <input type="text" id="signup-ref-code" autocomplete="off"> </div>
+            <p id="signup-error" class="error-message"></p>
+            <button type="submit" class="btn">Sign Up</button>
+            <p class="auth-switch">Already have an account? <a href="#" id="show-login">Login</a></p>
+        </form>
+
+         <!-- Forgot Password Form -->
+         <form id="forgot-password-form" class="hidden">
+            <h2>Reset Password</h2>
+            <p class="text-secondary mb-2 font-small">Enter email for reset link.</p>
+            <div class="form-group"> <label for="reset-email">Email</label> <input type="email" id="reset-email" required autocomplete="email"> </div>
+            <p id="reset-message" class="error-message"></p>
+            <button type="submit" class="btn">Send Reset Link</button>
+            <p class="auth-switch mt-2"><a href="#" id="back-to-login">Back to Login</a></p>
+        </form>
+    </div>
+
+    <!-- Main Application View -->
+    <div id="main-app-view" class="app-container hidden"> <!-- No sidebar-collapsed needed -->
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar">
+            <div class="logo">Adsense Miner</div>
+            <nav>
+                <ul>
+                    <li data-page="dashboard" class="active"><span class="material-icons">dashboard</span> <span>Dashboard</span></li>
+                    <li data-page="mining"><span class="material-icons">hardware</span> <span>Mining</span></li>
+                    <li data-page="deposit"><span class="material-icons">account_balance_wallet</span> <span>Deposit</span></li>
+                    <li data-page="withdraw"><span class="material-icons">payment</span> <span>Withdraw</span></li>
+                    <li data-page="referral"><span class="material-icons">group</span> <span>Referrals</span></li>
+                    <li data-page="support"><span class="material-icons">support_agent</span> <span>Support</span></li>
+                    <li data-page="guide"><span class="material-icons">help_outline</span> <span>How to Earn?</span></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main id="main-content" class="main-content">
+            <!-- Header -->
+            <header class="app-header">
+                <!-- ===== TOGGLE BUTTON REMOVED ===== -->
+                <h1 id="page-title">Dashboard</h1>
+                <div class="profile-section" id="profile-section">
+                    <button id="profile-button" class="profile-button" aria-label="User menu" aria-haspopup="true" aria-expanded="false">
+                        <span class="material-icons">account_circle</span>
+                        <span id="user-email-display"></span>
+                        <span class="material-icons">arrow_drop_down</span>
+                    </button>
+                    <div id="profile-dropdown" class="profile-dropdown" role="menu">
+                        <a href="#" id="logout-button" role="menuitem">Logout</a>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dynamic Page Content Area -->
+            <section id="page-content-area">
+                <!-- Content loaded here -->
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+             apiKey: "AIzaSyDhR3r8bJPmcnvZ2bok-MQVagKz6ucR5FA",
+             authDomain: "adsense-mining.firebaseapp.com",
+             projectId: "adsense-mining",
+             storageBucket: "adsense-mining.appspot.com",
+             messagingSenderId: "690576008613",
+             appId: "1:690576008613:android:565df72e84aa506a02744c"
+        };
+
+        // --- Initialize Firebase ---
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // --- DOM References ---
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const authView = document.getElementById('auth-view');
+        const mainAppView = document.getElementById('main-app-view');
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const forgotPasswordForm = document.getElementById('forgot-password-form');
+        const loginEmailInput = document.getElementById('login-email');
+        const loginPasswordInput = document.getElementById('login-password');
+        const signupEmailInput = document.getElementById('signup-email');
+        const signupPasswordInput = document.getElementById('signup-password');
+        const signupRefCodeInput = document.getElementById('signup-ref-code');
+        const resetEmailInput = document.getElementById('reset-email');
+        const loginError = document.getElementById('login-error');
+        const signupError = document.getElementById('signup-error');
+        const resetMessage = document.getElementById('reset-message');
+        const showSignupLink = document.getElementById('show-signup');
+        const showLoginLink = document.getElementById('show-login');
+        const forgotPasswordLink = document.getElementById('forgot-password-link');
+        const backToLoginLink = document.getElementById('back-to-login');
+        const sidebarLinks = document.querySelectorAll('#sidebar nav li');
+        const pageTitle = document.getElementById('page-title');
+        const pageContentArea = document.getElementById('page-content-area');
+        const userEmailDisplay = document.getElementById('user-email-display');
+        const profileSection = document.getElementById('profile-section');
+        const profileButton = document.getElementById('profile-button');
+        const profileDropdown = document.getElementById('profile-dropdown');
+        const logoutButton = document.getElementById('logout-button');
+        const bodyElement = document.body;
+        // const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn'); // <-- REMOVED
+
+        // --- Application State ---
+        let currentUser = null; let userData = null; let miningInterval = null;
+        let activePage = 'dashboard'; let firestoreListeners = [];
+
+        // --- Utility Functions ---
+        function showLoading() { loadingIndicator.classList.remove('hidden'); }
+        function hideLoading() { loadingIndicator.classList.add('hidden'); }
+        function clearErrors() { loginError.textContent = ''; signupError.textContent = ''; resetMessage.textContent = ''; }
+        function formatCurrency(amount) { return `$${Number(amount || 0).toFixed(2)}`; }
+        function formatDate(timestamp) { try { const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp); return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); } catch (e) { return "Invalid Date"; } }
+        function displayMessage(elementId, message, isError = true) { const el = document.getElementById(elementId); if (el) { el.textContent = message; el.className = isError ? 'error-message text-danger' : 'success-message text-success'; } }
+        function detachFirestoreListeners() { firestoreListeners.forEach(unsub => unsub()); firestoreListeners = []; }
+
+        // --- Authentication Logic ---
+        auth.onAuthStateChanged(user => {
+            showLoading(); clearErrors(); detachFirestoreListeners();
+            if (user) {
+                currentUser = user; userEmailDisplay.textContent = user.email; profileButton.setAttribute('aria-expanded', 'false');
+                fetchUserData(user.uid).then(() => { bodyElement.classList.remove('auth-active'); mainAppView.classList.remove('hidden'); authView.classList.add('hidden'); setActiveLink(activePage); loadPage(activePage); })
+                .catch(error => { console.error("Fetch user data error:", error); displayMessage('login-error', "Load failed."); auth.signOut(); })
+                .finally(() => { hideLoading(); });
+            } else {
+                currentUser = null; userData = null; stopMiningSimulation(); bodyElement.classList.add('auth-active'); mainAppView.classList.add('hidden'); authView.classList.remove('hidden');
+                loginForm.classList.remove('hidden'); signupForm.classList.add('hidden'); forgotPasswordForm.classList.add('hidden'); hideLoading();
+            }
+        });
+
+        // Login, Signup, Logout, Forgot Password, Auth Switch (Mostly unchanged)
+        loginForm.addEventListener('submit', (e) => { e.preventDefault(); clearErrors(); showLoading(); const email = loginEmailInput.value, password = loginPasswordInput.value; auth.signInWithEmailAndPassword(email, password).catch(error => { loginError.textContent = "Invalid email or password."; }).finally(() => { hideLoading(); }); });
+        signupForm.addEventListener('submit', async (e) => { e.preventDefault(); clearErrors(); showLoading(); const email = signupEmailInput.value, password = signupPasswordInput.value, refCode = signupRefCodeInput.value.trim(); try { const userCredential = await auth.createUserWithEmailAndPassword(email, password); const user = userCredential.user; const initialUserData = { email: user.email, uid: user.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp(), referralCode: generateReferralCode(user.uid), referredBy: refCode || null, totalDeposited: 0, currentInvestment: 0, totalMined: 0, miningStatus: 'idle', miningStartedAt: null, lastCalculationTime: null, activeReferrals: { level1: 0, level2: 0, level3: 0 }, referralEarnings: { level1: 0, level2: 0, level3: 0 } }; await db.collection('users').doc(user.uid).set(initialUserData); } catch (error) { if (error.code === 'auth/email-already-in-use') signupError.textContent = 'Email already registered.'; else if (error.code === 'auth/weak-password') signupError.textContent = 'Password too weak.'; else signupError.textContent = 'Signup failed.'; } finally { hideLoading(); } });
+        function generateReferralCode(uid) { const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ123456789'; let code = ''; for (let i = 0; i < 6; i++) { code += chars.charAt(Math.floor(Math.random() * chars.length)); } return code; }
+        logoutButton.addEventListener('click', (e) => { e.preventDefault(); profileSection.classList.remove('open'); profileButton.setAttribute('aria-expanded', 'false'); showLoading(); auth.signOut().catch(error => { console.error("Logout failed:", error); }).finally(() => hideLoading()); });
+        forgotPasswordLink.addEventListener('click', (e) => { e.preventDefault(); switchAuthForm('forgot'); });
+        forgotPasswordForm.addEventListener('submit', (e) => { e.preventDefault(); clearErrors(); showLoading(); const email = resetEmailInput.value; auth.sendPasswordResetEmail(email).then(() => { displayMessage('reset-message', 'Reset email sent!', false); forgotPasswordForm.reset(); }).catch(error => { displayMessage('reset-message', 'Could not send email.', true); }).finally(() => { hideLoading(); }); });
+        showSignupLink.addEventListener('click', (e) => { e.preventDefault(); switchAuthForm('signup'); }); showLoginLink.addEventListener('click', (e) => { e.preventDefault(); switchAuthForm('login'); }); backToLoginLink.addEventListener('click', (e) => { e.preventDefault(); switchAuthForm('login'); });
+        function switchAuthForm(formToShow) { clearErrors(); loginForm.classList.add('hidden'); signupForm.classList.add('hidden'); forgotPasswordForm.classList.add('hidden'); if (formToShow === 'login') loginForm.classList.remove('hidden'); else if (formToShow === 'signup') signupForm.classList.remove('hidden'); else if (formToShow === 'forgot') forgotPasswordForm.classList.remove('hidden'); }
+
+        // --- Profile Dropdown ---
+        profileButton.addEventListener('click', () => { const isOpen = profileSection.classList.toggle('open'); profileButton.setAttribute('aria-expanded', isOpen); });
+        document.addEventListener('click', (event) => { if (!profileSection.contains(event.target) && profileSection.classList.contains('open')) { profileSection.classList.remove('open'); profileButton.setAttribute('aria-expanded', 'false'); } });
+
+        // --- Sidebar Toggle REMOVED ---
+
+        // --- Firestore Data Fetching ---
+        async function fetchUserData(uid) { try { const docRef = db.collection('users').doc(uid); const docSnap = await docRef.get(); if (docSnap.exists) { userData = docSnap.data(); userData.totalDeposited = userData.totalDeposited || 0; userData.currentInvestment = userData.currentInvestment || 0; userData.totalMined = userData.totalMined || 0; userData.miningStatus = userData.miningStatus || 'idle'; userData.activeReferrals = userData.activeReferrals || { level1: 0, level2: 0, level3: 0 }; userData.referralEarnings = userData.referralEarnings || { level1: 0, level2: 0, level3: 0 }; } else { throw new Error("User data missing."); } } catch (error) { console.error("Error getting user document:", error); throw error; } }
+
+        // --- Navigation ---
+        sidebarLinks.forEach(link => { link.addEventListener('click', () => { const page = link.dataset.page; if (page !== activePage) { loadPage(page); } if (profileSection.classList.contains('open')) { profileSection.classList.remove('open'); profileButton.setAttribute('aria-expanded', 'false'); } }); });
+        function setActiveLink(page) { sidebarLinks.forEach(l => { l.classList.toggle('active', l.dataset.page === page); }); }
+
+        // --- Page Loading ---
+        function loadPage(page) { if (!currentUser || !userData) { auth.signOut(); return; } showLoading(); detachFirestoreListeners(); activePage = page; setActiveLink(page); pageTitle.textContent = page.charAt(0).toUpperCase() + page.slice(1).replace('-', ' '); pageContentArea.innerHTML = ''; stopMiningSimulation(); try { switch (page) { case 'dashboard': renderDashboard(); break; case 'mining': renderMiningPage(); break; case 'deposit': renderDepositPage(); break; case 'withdraw': renderWithdrawPage(); break; case 'referral': renderReferralPage(); break; case 'support': renderSupportPage(); break; case 'guide': renderGuidePage(); break; default: pageContentArea.innerHTML = '<p>Not found.</p>'; } } catch (error) { pageContentArea.innerHTML = `<p class="text-danger">Error loading.</p>`; } finally { mainAppView.querySelector('#main-content').scrollTop = 0; hideLoading(); } }
+
+        // --- Page Rendering Functions ---
+
+        // ===== renderDashboard (Graph fix is kept) =====
+function renderDashboard() {
+    const total = userData.totalMined || 0;
+    const today = total;
+    const yesterday = 0;
+    const week = total;
+    const month = total; // Simplified names
+             pageContentArea.innerHTML = `
+                <div class="grid-container">
+                    <div class="card stat-card"><div class="stat-label">Today's (Est.)</div><div class="stat-value">${formatCurrency(today)}</div></div>
+                    <div class="card stat-card"><div class="stat-label">Yesterday's (Est.)</div><div class="stat-value">${formatCurrency(yesterday)}</div></div>
+                    <div class="card stat-card"><div class="stat-label">This Week (Est.)</div><div class="stat-value">${formatCurrency(week)}</div></div>
+                     <div class="card stat-card"><div class="stat-label">This Month (Est.)</div><div class="stat-value">${formatCurrency(month)}</div></div>
+                </div>
+                <div class="card">
+                    <h3 class="card-title"><span class="material-icons">show_chart</span> Earnings Trend </h3>
+                    <div class="chart-container"> <canvas id="earningsChart"></canvas> </div>
+                    <p class="text-secondary font-small text-center mt-1">Earnings increase based on mining activity.</p>
+                </div>
+                <div class="card">
+                    <h3 class="card-title"><span class="material-icons">account_balance</span> Account Summary</h3>
+                     <div class="info-pair"><span>Deposited:</span> <span>${formatCurrency(userData.totalDeposited)}</span></div>
+                     <div class="info-pair"><span>Investment:</span> <span>${formatCurrency(userData.currentInvestment)}</span></div>
+                     <div class="info-pair"><span>Mined:</span> <span class="text-success" style="font-weight:bold;">${formatCurrency(userData.totalMined)}</span></div>
+                     <div class="info-pair"><span>Ref Code:</span> <span>${userData.referralCode || 'N/A'}</span></div>
+                </div>`;
+            const ctx = document.getElementById('earningsChart')?.getContext('2d');
+            if (ctx && typeof Chart !== 'undefined') {
+                new Chart(ctx, { type: 'line', data: { labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], datasets: [{ label: 'Daily Earnings (Est.)', data: [1.2, 1.9, 1.3, 2.5, 2.3, 2.8, 2.1].map(v => v * (userData.totalMined || 1) * 0.01), borderColor: 'rgba(26, 115, 232, 1)', backgroundColor: 'rgba(26, 115, 232, 0.1)', borderWidth: 2.5, tension: 0.4, fill: true, pointBackgroundColor: 'rgba(26, 115, 232, 1)', pointRadius: 4, pointHoverRadius: 6, }] }, options: { responsive: true, maintainAspectRatio: false, scales: {
+  y: {
+    beginAtZero: true,
+    title: {
+      display: true,
+      text: 'Earnings ($)',
+      color: '#5f6368',
+      font: {
+        size: 14
+      }
+    },
+    ticks: {
+      callback: value => formatCurrency(value)
+    }
+  }
+}, plugins: { legend: { display: false }, tooltip: { callbacks: { label: context => ` ${context.dataset.label}: ${formatCurrency(context.parsed.y)}` } } } } });
+            } else if (typeof Chart === 'undefined') { console.warn("Chart.js not loaded."); document.getElementById('earningsChart')?.parentElement.insertAdjacentHTML('beforeend', '<p class="text-secondary font-small">Chart library failed.</p>'); }
+        }
+        // ================================================
+
+        // renderMiningPage, startMining, stopMining, start/stopSimulation (Unchanged)
+        function renderMiningPage() { const invest = Number(userData?.currentInvestment || 0), canMine = invest >= 1, isMining = userData?.miningStatus === 'mining', baseSpeed = 2, refCount = (userData?.activeReferrals?.level1 || 0) + (userData?.activeReferrals?.level2 || 0) + (userData?.activeReferrals?.level3 || 0), maxBonus = 10, refBonus = Math.min(refCount * 0.5, maxBonus), totalSpeed = baseSpeed + refBonus; pageContentArea.innerHTML = `<div class="card"><h3 class="card-title"><span class="material-icons">hardware</span> Mining</h3> ${!canMine && !isMining ? `<p class="text-danger mb-2 font-small"><span class="material-icons">warning</span> Min $1 needed.</p>` : ''}<div class="info-pair"><span>Status:</span> <span id="mining-status-text" style="font-weight:bold;color:${isMining ? 'var(--success-color)' : (canMine ? 'var(--text-color)' : 'var(--text-color-secondary)')};">${isMining ? 'Active' : (canMine ? 'Idle' : 'Deposit Required')}</span></div><div class="info-pair"><span>Investment:</span> <span>${formatCurrency(invest)}</span></div><div class="info-pair"><span>Base Speed:</span> <span>${baseSpeed.toFixed(1)}%/d</span></div><div class="info-pair"><span>Ref Bonus:</span> <span>+${refBonus.toFixed(1)}%/d ${refBonus >= maxBonus ? '(Max)' : ''}</span></div><div class="info-pair"><span>Total Speed:</span> <span style="color:var(--primary-color);font-weight:bold;">${totalSpeed.toFixed(1)}%/d</span></div><div id="mining-progress-bar" class="${!isMining ? 'hidden' : ''}"><div id="mining-progress-fill" style="width:${isMining ? '10%' : '0%'};"></div></div><p id="mining-timer" class="text-center font-small text-secondary mt-1" style="min-height:1.2em;"></p><button id="start-mining-btn" class="btn mt-2 ${!canMine || isMining ? 'hidden' : ''}" ${!canMine ? 'disabled' : ''}><span class="material-icons">play_arrow</span> Start</button><button id="stop-mining-btn" class="btn mt-2 ${!isMining ? 'hidden' : ''}" style="background-color:var(--error-color);"><span class="material-icons">stop</span> Stop</button>${!canMine && !isMining ? '<p class="text-secondary font-small mt-1">Deposit to enable.</p>' : ''}</div><div class="card"><h3 class="card-title"><span class="material-icons">analytics</span> Stats</h3><div class="info-pair"><span>Mined:</span> <span id="total-mined-display" style="font-weight:bold;">${formatCurrency(userData?.totalMined)}</span></div><div class="info-pair"><span>Time Active:</span> <span id="time-since-start">${isMining ? 'Calculating...' : 'N/A'}</span></div><p class="mt-2 font-small text-secondary">Earnings simulated.</p></div>`; document.getElementById('start-mining-btn')?.addEventListener('click', startMining); document.getElementById('stop-mining-btn')?.addEventListener('click', stopMining); if (isMining) startMiningSimulation(userData.miningStartedAt); else stopMiningSimulation(); }
+        function startMining() { if ((userData.currentInvestment || 0) < 1 || userData.miningStatus === 'mining') return; showLoading(); const startTime = firebase.firestore.FieldValue.serverTimestamp(); db.collection('users').doc(currentUser.uid).update({ miningStatus: 'mining', miningStartedAt: startTime, lastCalculationTime: startTime }).then(() => fetchUserData(currentUser.uid)).then(() => renderMiningPage()).catch(err => alert("Failed start.")).finally(hideLoading); }
+        function stopMining() { if (userData.miningStatus !== 'mining') return; showLoading(); db.collection('users').doc(currentUser.uid).update({ miningStatus: 'idle', miningStartedAt: null }).then(() => fetchUserData(currentUser.uid)).then(() => renderMiningPage()).catch(err => alert("Failed stop.")).finally(hideLoading); }
+function startMiningSimulation(startTime) {
+    stopMiningSimulation();
+    const start = startTime?.toDate() || new Date();
+    const timerEl = document.getElementById('time-since-start'),
+          pFill = document.getElementById('mining-progress-fill'),
+          mTimer = document.getElementById('mining-timer');
+
+    function update() {
+        const now = new Date(), elapsed = now - start;
+        const h = `${Math.floor(elapsed / 36e5)}`.padStart(2, '0'),
+              m = `${Math.floor((elapsed % 36e5) / 6e4)}`.padStart(2, '0'),
+              s = `${Math.floor((elapsed % 6e4) / 1e3)}`.padStart(2, '0');
+
+        if (timerEl) timerEl.textContent = `${h}:${m}:${s}`;
+        if (mTimer) mTimer.textContent = `Mining active...`;
+        if (pFill) {
+            const cw = parseFloat(pFill.style.width) || 0;
+            pFill.style.width = `${Math.min(100, cw + .5)}%`;
+            if (cw >= 100) pFill.style.width = '10%';
+        }
+    }
+
+    update();
+
+    miningInterval = setInterval(() => {
+        update();
+        applyMiningEarnings();
+        fetchUserData(currentUser.uid).then(renderDashboard); // ✅ Live balance update
+    }, 60000);
+}
+        function stopMiningSimulation() { if (miningInterval) { clearInterval(miningInterval); miningInterval = null; } const pFill = document.getElementById('mining-progress-fill'), timerEl = document.getElementById('time-since-start'), mTimer = document.getElementById('mining-timer'); if (pFill) pFill.style.width = '0%'; if (timerEl) timerEl.textContent = 'N/A'; if (mTimer) mTimer.textContent = ''; }
+
+        // renderDepositPage, handleDepositSubmit, loadDepositHistory (Unchanged)
+        function renderDepositPage() { pageContentArea.innerHTML = `<div class="card"><h3 class="card-title"><span class="material-icons">add_card</span> Deposit</h3><p class="text-secondary mb-2 font-small">Send via JC/EP, submit TID.</p><div class="info-pair"><span>JazzCash:</span> <strong>0348-3886735</strong></div><div class="info-pair"><span>EasyPaisa:</span> <strong>0348-3886735</strong></div><form id="deposit-form" class="mt-2"><div class="form-group"><label for="deposit-amount">Amount ($)</label><input type="number" id="deposit-amount" step=".01" min="1" required></div><div class="form-group"><label for="deposit-method">Method</label><select id="deposit-method" required><option value="" disabled selected>--</option><option>JazzCash</option><option>EasyPaisa</option></select></div><div class="form-group"><label for="deposit-tid">TID</label><input type="text" id="deposit-tid" required></div><p id="deposit-message" class="success-message mb-1"></p><button type="submit" class="btn">Submit</button></form></div><div class="card"><h3 class="card-title"><span class="material-icons">history</span> History</h3><div id="deposit-history-container" class="table-container"><p class="text-secondary p-3">Loading...</p></div></div>`; document.getElementById('deposit-form').addEventListener('submit', handleDepositSubmit); loadDepositHistory(); }
+        async function handleDepositSubmit(e) { e.preventDefault(); const a = document.getElementById('deposit-amount').value, m = document.getElementById('deposit-method').value, t = document.getElementById('deposit-tid').value.trim(); const amount = parseFloat(a); if (isNaN(amount) || amount < 1 || !m || !t) { displayMessage('deposit-message', 'Fill fields (min $1).', true); return; } showLoading(); try { await db.collection('deposits').add({ userId: currentUser.uid, email: currentUser.email, amount: amount, method: m, transactionId: t, status: 'Pending', requestedAt: firebase.firestore.FieldValue.serverTimestamp() }); displayMessage('deposit-message', 'Submitted.', false); e.target.reset(); } catch (err) { displayMessage('deposit-message', 'Failed.', true); } finally { hideLoading(); } }
+        function loadDepositHistory() { const container = document.getElementById('deposit-history-container'); if (!container || !currentUser) return; container.innerHTML = `<p class="text-secondary p-3">Loading...</p>`; const q = db.collection('deposits').where('userId', '==', currentUser.uid).orderBy('requestedAt', 'desc').limit(50); const unsub = q.onSnapshot(snap => { if (snap.empty) { container.innerHTML = '<p class="text-secondary p-3">No history.</p>'; return; } let html = ``; snap.forEach(doc => { const d = doc.data(); html += `<tr><td>${formatDate(d.requestedAt)}</td><td>${formatCurrency(d.amount)}</td><td>${d.method||'N/A'}</td><td>${d.transactionId||'N/A'}</td><td><span class="status ${d.status?.toLowerCase()||'unknown'}">${d.status||'Unk'}</span></td></tr>`; }); container.innerHTML = `<table><thead><tr><th>Date</th><th>Amt</th><th>Method</th><th>TID</th><th>Status</th></tr></thead><tbody>${html}</tbody></table>`; snap.docChanges().forEach(c => { if ((c.type === 'added' || c.type === 'modified')) { const d = c.doc.data(), id = c.doc.id; if (d.status === 'Confirmed' && d.investmentApplied !== true) { const amt = Number(d.amount || 0); if (amt > 0) { const uRef = db.collection('users').doc(currentUser.uid), dRef = db.collection('deposits').doc(id); db.runTransaction(async (t) => { t.update(uRef, { currentInvestment: firebase.firestore.FieldValue.increment(amt), totalDeposited: firebase.firestore.FieldValue.increment(amt) }); t.update(dRef, { investmentApplied: true }); }).then(() => fetchUserData(currentUser.uid).then(() => { if (activePage==='dashboard'||activePage==='mining') loadPage(activePage); })).catch(err => console.error(`Txn FAIL ${id}:`, err)); } } } }); }, err => { container.innerHTML = '<p class="text-danger p-3">Error history.</p>'; }); firestoreListeners.push(unsub); }
+
+        // renderWithdrawPage, handleWithdrawSubmit, loadWithdrawHistory (Unchanged)
+        function renderWithdrawPage() { const bal = userData.totalMined || 0; pageContentArea.innerHTML = `<div class="card"><h3 class="card-title"><span class="material-icons">price_check</span> Withdraw</h3><p class="text-secondary mb-2 font-small">Request. 24-48h.</p><div class="info-pair mb-2"><span>Balance:</span> <strong class="text-success">${formatCurrency(bal)}</strong></div><form id="withdraw-form"><div class="form-group"><label for="withdraw-amount">Amount ($)</label><input type="number" id="withdraw-amount" step=".01" min="1" max="${bal}" required><small class="text-secondary font-small d-block mt-1">Min $1</small></div><div class="form-group"><label for="withdraw-method">Method</label><select id="withdraw-method" required><option value="" disabled selected>--</option><option>JazzCash</option><option>EasyPaisa</option></select></div><div class="form-group"><label for="withdraw-account">Account No.</label><input type="text" id="withdraw-account" required></div><p id="withdraw-message" class="success-message mb-1"></p><button type="submit" class="btn" ${bal < 1 ? 'disabled' : ''}>Submit</button>${bal < 1 ? '<p class="text-danger font-small mt-1">Insufficient funds.</p>' : ''}</form></div><div class="card"><h3 class="card-title"><span class="material-icons">history_toggle_off</span> History</h3><div id="withdraw-history-container" class="table-container"><p class="text-secondary p-3">Loading...</p></div></div>`; document.getElementById('withdraw-form').addEventListener('submit', handleWithdrawSubmit); loadWithdrawHistory(); }
+        async function handleWithdrawSubmit(e) { e.preventDefault(); const a = document.getElementById('withdraw-amount').value, m = document.getElementById('withdraw-method').value, acc = document.getElementById('withdraw-account').value.trim(); const amount = parseFloat(a), bal = userData.totalMined || 0; if (isNaN(amount) || amount < 1 || !m || !acc) { displayMessage('withdraw-message', 'Fill fields (min $1).', true); return; } if (amount > bal) { displayMessage('withdraw-message', 'Amount exceeds balance.', true); return; } showLoading(); try { await db.collection('withdrawals').add({ userId: currentUser.uid, email: currentUser.email, amount: amount, method: m, accountNumber: acc, status: 'Pending', requestedAt: firebase.firestore.FieldValue.serverTimestamp() }); displayMessage('withdraw-message', 'Submitted.', false); e.target.reset(); } catch (err) { displayMessage('withdraw-message', 'Failed.', true); } finally { hideLoading(); } }
+        function loadWithdrawHistory() { const container = document.getElementById('withdraw-history-container'); if (!container) return; container.innerHTML = `<p class="text-secondary p-3">Loading...</p>`; const q = db.collection('withdrawals').where('userId', '==', currentUser.uid).orderBy('requestedAt', 'desc').limit(25); const unsub = q.onSnapshot(snap => { if (snap.empty) { container.innerHTML = '<p class="text-secondary p-3">No history.</p>'; return; } let html = `<table><thead><tr><th>Date</th><th>Amt</th><th>Method</th><th>Acc</th><th>Status</th></tr></thead><tbody>`; snap.forEach(doc => { const d = doc.data(); html += `<tr><td>${formatDate(d.requestedAt)}</td><td>${formatCurrency(d.amount)}</td><td>${d.method}</td><td>${d.accountNumber}</td><td><span class="status ${d.status.toLowerCase()}">${d.status}</span></td></tr>`; }); html += '</tbody></table>'; container.innerHTML = html; const completed = snap.docChanges().some(c => c.type === 'modified' && c.doc.data().status === 'Completed'); if (completed) fetchUserData(currentUser.uid); }, err => { container.innerHTML = '<p class="text-danger p-3">Error history.</p>'; }); firestoreListeners.push(unsub); }
+
+        // renderReferralPage (Unchanged)
+        function renderReferralPage() { const link = `${location.origin}${location.pathname}?ref=${userData.referralCode||''}`; const l1c = userData.activeReferrals?.level1||0, l2c = userData.activeReferrals?.level2||0, l3c = userData.activeReferrals?.level3||0; const l1e = userData.referralEarnings?.level1||0, l2e = userData.referralEarnings?.level2||0, l3e = userData.referralEarnings?.level3||0; const refs = l1c+l2c+l3c, bonus = Math.min(refs * .5, 10); pageContentArea.innerHTML = `<div class="card"><h3 class="card-title"><span class="material-icons">share</span> Link</h3><p class="text-secondary mb-2 font-small">Share & earn.</p><div id="referral-link-container"><input type="text" id="referral-link-input" value="${link}" readonly><button id="copy-ref-link-btn"><span class="material-icons">content_copy</span>Copy</button></div><p id="copy-status" class="font-small mt-1" style="min-height:1em;"></p></div><div class="card"><h3 class="card-title"><span class="material-icons">emoji_events</span> Benefits</h3><p><strong>Speed Boost:</strong> +0.5%/ref (max +10%).</p><p><strong>Commission (Demo):</strong> L1: 3%, L2: 2%, L3: 1%.</p></div><div class="grid-container"><div class="card"><h3 class="card-title"><span class="material-icons">groups</span> Referrals</h3><div class="info-pair"><span>L1:</span> <span>${l1c}</span></div><div class="info-pair"><span>L2:</span> <span>${l2c}</span></div><div class="info-pair"><span>L3:</span> <span>${l3c}</span></div><hr style="border:0;border-top:1px solid var(--border-color);margin:10px 0;"><div class="info-pair"><strong>Total:</strong> <strong>${refs}</strong></div><div class="info-pair"><strong>Bonus:</strong> <strong class="text-primary">+${bonus.toFixed(1)}%</strong></div></div><div class="card"><h3 class="card-title"><span class="material-icons">paid</span> Earnings (Est.)</h3><div class="info-pair"><span>L1:</span> <span>${formatCurrency(l1e)}</span></div><div class="info-pair"><span>L2:</span> <span>${formatCurrency(l2e)}</span></div><div class="info-pair"><span>L3:</span> <span>${formatCurrency(l3e)}</span></div><hr style="border:0;border-top:1px solid var(--border-color);margin:10px 0;"><div class="info-pair"><strong>Total:</strong> <strong class="text-success">${formatCurrency(l1e+l2e+l3e)}</strong></div></div></div>`; document.getElementById('copy-ref-link-btn').addEventListener('click', () => { navigator.clipboard.writeText(document.getElementById('referral-link-input').value).then(() => displayMessage('copy-status', 'Copied!', false)).catch(err => displayMessage('copy-status', 'Copy failed.', true)); }); }
+
+        // renderSupportPage, handleTicketSubmit, loadSupportTickets (Unchanged)
+        function renderSupportPage() { pageContentArea.innerHTML = `<div class="card"><h3 class="card-title"><span class="material-icons">contact_support</span> New Ticket</h3><form id="support-ticket-form"><div class="form-group"><label for="ticket-subject">Subject</label><input type="text" id="ticket-subject" required maxlength="100"></div><div class="form-group"><label for="ticket-message">Message</label><textarea id="ticket-message" required maxlength="1500"></textarea></div><p id="ticket-message-status" class="success-message mb-1"></p><button type="submit" class="btn">Submit</button></form></div><div class="card"><h3 class="card-title"><span class="material-icons">history</span> Tickets</h3><div id="support-tickets-container" class="table-container"><p class="text-secondary p-3">Loading...</p></div></div>`; document.getElementById('support-ticket-form').addEventListener('submit', handleTicketSubmit); loadSupportTickets(); }
+        async function handleTicketSubmit(e) { e.preventDefault(); const sub = document.getElementById('ticket-subject').value.trim(), msg = document.getElementById('ticket-message').value.trim(); if (!sub || !msg) { displayMessage('ticket-message-status', 'Provide subject & message.', true); return; } showLoading(); try { await db.collection('tickets').add({ userId: currentUser.uid, email: currentUser.email, subject: sub, status: 'Open', createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp(), messages: [{ sender: 'user', text: msg, timestamp: new Date().toISOString() }] }); displayMessage('ticket-message-status', 'Ticket created.', false); e.target.reset(); } catch (err) { displayMessage('ticket-message-status', 'Failed.', true); } finally { hideLoading(); } }
+        function loadSupportTickets() { const container = document.getElementById('support-tickets-container'); if (!container) return; container.innerHTML = `<p class="text-secondary p-3">Loading...</p>`; const q = db.collection('tickets').where('userId', '==', currentUser.uid).orderBy('updatedAt', 'desc').limit(20); const unsub = q.onSnapshot(snap => { if (snap.empty) { container.innerHTML = '<p class="text-secondary p-3">No tickets.</p>'; return; } let html = `<table><thead><tr><th>Updated</th><th>Subject</th><th>Status</th></tr></thead><tbody>`; snap.forEach(doc => { const d = doc.data(); html += `<tr style="cursor:pointer;" title="View ${doc.id}"><td>${formatDate(d.updatedAt)}</td><td>${d.subject}</td><td><span class="status ${d.status.toLowerCase()}">${d.status}</span></td></tr>`; }); html += '</tbody></table>'; container.innerHTML = html; }, err => { container.innerHTML = '<p class="text-danger p-3">Error tickets.</p>'; }); firestoreListeners.push(unsub); }
+
+        // renderGuidePage (Unchanged)
+        function renderGuidePage() { pageContentArea.innerHTML = `<div class="card"><div class="guide-section"><h3><span class="material-icons">hardware</span> Mining</h3><p>Simulates returns:</p><ol><li>Deposit ($1 min).</li><li>Start Mining.</li><li>Earn <strong>2%</strong> daily + bonuses.</li></ol><div class="guide-visual"><span class="material-icons">account_balance_wallet</span>→<span class="material-icons">play_circle_outline</span>→<span class="material-icons">trending_up</span></div></div><div class="guide-section"><h3><span class="material-icons">group</span> Referrals</h3><p>Share link:</p><ul><li><strong>Speed Boost:</strong> +0.5%/ref (max +10%).</li><li><strong>Commission (Demo):</strong> L1: 3%, L2: 2%, L3: 1%.</li></ul><div class="guide-visual"><span class="material-icons">share</span>→<span class="material-icons">people</span>→<span class="material-icons">speed</span></div></div><div class="guide-section"><h3><span class="material-icons">sync_alt</span> Deposit/Withdraw</h3><p><strong>Deposit:</strong> Note details, Send funds, Submit TID, Wait 'Confirmed'.</p><p><strong>Withdraw:</strong> Check balance, Enter details, Submit, Wait 'Completed'.</p></div></div>`; }
+
+        // --- Initial Load & Referral Code Handling ---
+         window.addEventListener('load', () => { const params = new URLSearchParams(location.search); const ref = params.get('ref'); if (ref && signupRefCodeInput) signupRefCodeInput.value = ref; });
+         async function applyMiningEarnings() {
+    if (!currentUser || !userData || userData.miningStatus !== 'mining') return;
+
+    const now = new Date();
+    const lastCalc = userData.lastCalculationTime?.toDate?.() || userData.miningStartedAt?.toDate?.() || now;
+    const diffMs = now - lastCalc;
+
+    const diffMinutes = diffMs / (1000 * 60);
+    if (diffMinutes < 1) return;
+
+    const invest = userData.currentInvestment || 0;
+    if (invest <= 0) return;
+
+    const refCount =
+        (userData.activeReferrals?.level1 || 0) +
+        (userData.activeReferrals?.level2 || 0) +
+        (userData.activeReferrals?.level3 || 0);
+
+    const speed = Math.min(2 + refCount * 0.5, 12);
+    const dailyEarning = (invest * speed) / 100;
+    const perMinuteEarning = dailyEarning / 1440;
+    const earnedNow = perMinuteEarning * diffMinutes;
+
+    await db.runTransaction(async (tx) => {
+        const userRef = db.collection('users').doc(currentUser.uid);
+        tx.update(userRef, {
+            totalMined: firebase.firestore.FieldValue.increment(earnedNow),
+            lastCalculationTime: firebase.firestore.Timestamp.fromDate(now)
+        });
+    });
+
+    await fetchUserData(currentUser.uid);
+}
+    </script>       
+</body>
+</html>
